@@ -1,55 +1,58 @@
-import puppeteer from "puppeteer";
-import { initWSA } from "./wsa.js";
+import puppeteer from "puppeteer"
+import { initWSA } from "./wsa.js"
+import express, { type Express } from "express"
 
-async function initBrowser() {
-  const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome-stable",
-    //@ts-ignore
-    headless: "new", // CRITICAL: Use the "new" headless mode, not true/false
-    args: [
-      "--use-fake-ui-for-media-stream", // CRITICAL: Auto-grants microphone permission
-      "--disable-background-timer-throttling",
-      // "--no-sandbox", // Uncomment ONLY if Wayland throws a strict sandbox error
-    ],
-  });
+const PORT = process.env.PORT || "3232"
 
-  const page = await browser.newPage();
-
-  // CRITICAL DEBUGGING: Pipe browser console logs to your Node terminal
-  page.on("console", (msg) => console.log("[Browser]", msg.text()));
-
-  // Web Speech API sometimes fails on 'about:blank'.
-  // We navigate to a dummy local HTML string to give it a proper secure context.
-  await page.goto(
-    "data:text/html,<html><body><h1>STT Injector</h1></body></html>",
-  );
-
-  return { browser, page };
-}
+main().catch(console.error)
 
 async function main() {
-  const { browser, page } = await initBrowser();
+    const { browser, page } = await initBrowser()
 
-  console.log("Injecting Web Speech API...");
+    const app = initApp()
+    app.listen(PORT, () => {
+        console.log(`SERVER STARTED ON PORT: `, PORT)
+    })
 
-  // FIX: Pass the function reference directly. Puppeteer will serialize and execute it.
-  await page.evaluate(initWSA);
-
-  console.log("Listening for 10 seconds... Speak into your microphone!");
-
-  // Wait 10 seconds to give you time to speak
-  await new Promise((resolve) => setTimeout(resolve, 10000));
-
-  //@ts-ignore
-  // Retrieve the transcript
-  const transcript = await page.evaluate(() => window.transcript || "");
-
-  console.log("\n--- FINAL RESULT ---");
-  console.log("Transcribed text:", transcript);
-  console.log("--------------------\n");
-
-  await browser.close();
-  console.log("Browser closed.");
+    await page.exposeFunction("onSpeechUpdate", handleSpeechUpdate)
+    await page.evaluate(initWSA)
 }
 
-main().catch(console.error);
+function initApp() {
+    const app: Express = express()
+    app.get("/start", (req, res) => {
+        res.send("start")
+    })
+    return app
+}
+
+async function initBrowser() {
+    const browser = await puppeteer.launch({
+        executablePath: "/usr/bin/google-chrome-stable",
+        //@ts-ignore
+        headless: "new", // CRITICAL: Use the "new" headless mode, not true/false
+        args: [
+            "--use-fake-ui-for-media-stream", // CRITICAL: Auto-grants microphone permission
+            "--disable-background-timer-throttling",
+            // "--no-sandbox", // Uncomment ONLY if Wayland throws a strict sandbox error
+        ],
+    })
+
+    const page = await browser.newPage()
+    page.on("console", (msg) => console.log("[Browser]", msg.text()))
+
+    // WSA fails sometimes on /about:blank
+    await page.goto("data:text/html,<html><body><h1>STT Injector</h1></body></html>")
+
+    return { browser, page }
+}
+
+async function handleSpeechUpdate(payload: { totalText: string; interimResults: string }) {
+    console.log(`\n[NODE] Total: "${payload.totalText}", Interim: "${payload.interimResults}`)
+}
+
+async function sleep(ms: number) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms)
+    })
+}
