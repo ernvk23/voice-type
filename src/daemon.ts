@@ -41,7 +41,7 @@ export default class Daemon {
         })
     }
 
-    private async stopTranscription(reason: string) {
+    private async stopTranscription(reason: "intentional" | "offline") {
         if (this.stopCooldown) {
             log(`Stop request ignored - still in cooldown period (reason: ${reason})`)
             return
@@ -105,8 +105,7 @@ export default class Daemon {
 
         await this.page.goto("data:text/html,<html><body><h1>Wraith</h1></body></html>")
         await this.page.exposeFunction("onSpeechUpdate", this.handleSpeechUpdate.bind(this))
-        await this.page.exposeFunction("onSpeechError", this.handleSpeechError.bind(this))
-        await this.page.exposeFunction("handleWsaClose", this.handleWsaClose.bind(this))
+        await this.page.exposeFunction("onOffline", this.handleOffline.bind(this))
         await this.page.evaluate(initWSA)
     }
 
@@ -118,14 +117,9 @@ export default class Daemon {
         this.typingController.calculateAndApplyDiff(payload.text)
     }
 
-    private handleSpeechError(payload: { error: string; message: string }) {
-        const isWarning = ["network", "not-allowed", "permission-denied"].includes(payload.error)
-        log(`${isWarning ? "WARNING" : "ERROR"}: ${payload.message}`)
-    }
-
-    private async handleWsaClose(reason: string) {
-        if (!this.isWSAListening) return
-        await this.stopTranscription(reason)
+    private async handleOffline(payload: {}) {
+        log("Offline. Please connect to network")
+        await this.stopTranscription("offline")
     }
 
     //start spawns browser and server listener

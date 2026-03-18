@@ -3,7 +3,7 @@ const ERROR_MESSAGES = {
     "not-allowed": "Microphone access denied - check browser settings",
     "permission-denied": "Microphone access denied - check browser settings",
     "audio-capture": "No microphone found - check audio input devices",
-    aborted: "Speech recognition was aborted",
+    aborted: "rec was aborted",
 }
 
 export function initWSA() {
@@ -20,11 +20,8 @@ export function initWSA() {
     rec.interimResults = true
     rec.lang = "en-EN"
 
-    window.isIntentionalStop = true
-    window.hasNetworkError = false
-
     rec.onstart = () => {
-        console.log("Listening for audio...")
+        console.log("Listening...")
     }
 
     rec.onresult = (event) => {
@@ -42,29 +39,12 @@ export function initWSA() {
     }
 
     rec.onerror = (event) => {
-        if (event.error === "no-speech") return
-
-        const message = ERROR_MESSAGES[event.error] || `Speech recognition error: ${event.error}`
-        if (event.error === "network") window.hasNetworkError = true
-
-        console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: event.error, message })
-        }
+        console.error(JSON.stringify(event))
+        if (window.onOffline) window.onOffline()
     }
 
     rec.onend = () => {
-        let reason = "intentional"
-
-        if (!window.isIntentionalStop && !window.hasNetworkError) {
-            reason = "silence"
-        } else if (window.hasNetworkError) {
-            reason = "network-error"
-        }
-
-        if (window.handleWsaClose) {
-            window.handleWsaClose(reason)
-        }
+        console.log("Stopped listening")
     }
 
     window.recognition = rec
@@ -72,57 +52,30 @@ export function initWSA() {
 
 export function startListening() {
     if (!window.recognition) {
-        const message = "Speech recognition not initialized"
+        const message = "rec not initialized"
         console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: "not-initialized", message })
-        }
         return
     }
-
-    // Check network connectivity before starting
-    if (!navigator.onLine) {
-        const message = ERROR_MESSAGES.network
-        console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: "network", message })
-        }
-        return
-    }
-
-    window.isIntentionalStop = false
-    window.hasNetworkError = false
 
     try {
         window.recognition.start()
     } catch (e) {
-        const message = `Error starting: ${e.message || e}`
+        const message = `Error starting rec: ${e.message || e}`
         console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: "start-failed", message })
-        }
     }
 }
 
 export function stopListening() {
     if (!window.recognition) {
-        const message = "Speech recognition not initialized"
+        const message = "rec not initialized"
         console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: "not-initialized", message })
-        }
         return
     }
-
-    window.isIntentionalStop = true
 
     try {
         window.recognition.stop()
     } catch (e) {
-        const message = `Error stopping: ${e.message || e}`
+        const message = `Error stopping rec: ${e.message || e}`
         console.error(message)
-        if (window.onSpeechError) {
-            window.onSpeechError({ error: "stop-failed", message })
-        }
     }
 }
