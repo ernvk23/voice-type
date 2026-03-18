@@ -2,21 +2,65 @@ import puppeteer from "puppeteer"
 import { initWSA, startListening, stopListening } from "./browser.js"
 import express, { type Express } from "express"
 import { log } from "./logger.js"
+import { spawn, type ChildProcessWithoutNullStreams } from "child_process"
 
+enum DiffEnum {
+    NoChange = "NO_CHANGE",
+    ChangeBoth = "CHANGE_BOTH",
+    ChangeInterim = "CHANGE_INTERIM",
+    ChangeBothAndClearTotal = "CHANGE_BOTH_AND_CLEAR_TOTAL",
+}
 process.title = "Wraith-server"
 const PORT = process.env.PORT || 3232
+
+class TypingController {
+    private prevInterim: string = ""
+
+    //
+    calculateDiff(currInterim: string): DiffEnum {
+        const sameInterim = currInterim.length == this.prevInterim.length
+        if (sameInterim) return DiffEnum.NoChange
+        else {
+        }
+
+        return DiffEnum.NoChange
+    }
+}
 
 class Daemon {
     private browser: puppeteer.Browser | null = null
     private page: puppeteer.Page | null = null
-    private isListening: boolean = false
+    private isWSAListening: boolean = false
     private app: Express
-    private port: string | number
+    private dotool: ChildProcessWithoutNullStreams
+    private diffCalculator: TypingController = new TypingController()
 
-    constructor(port: string | number) {
-        this.port = port
+    constructor() {
         this.app = express()
         this.setupRoutes()
+        this.dotool = this.initDotool()
+    }
+
+    private initDotool() {
+        const dotool = spawn("dotool")
+        dotool.stderr.on("data", (data) => {
+            const lines = data.toString().split("\n").filter(Boolean)
+            for (const line of lines) {
+                console.log(`[DOTOOL] ${line}`)
+            }
+        })
+        dotool.on("exit", (code, signal) => {
+            log(`dotool exited with code [${code}] and signal [${signal}]`)
+        })
+
+        return dotool
+    }
+    private insertText(text: string) {
+        if (!this.dotool.stdin.writable) {
+            log("dotool stdin not writable")
+            return
+        }
+        this.dotool.stdin.write(`type ${text} \n`)
     }
 
     private setupRoutes() {
@@ -25,12 +69,12 @@ class Daemon {
                 log("Browser not ready - cannot start transcription")
                 return
             }
-            if (this.isListening) {
+            if (this.isWSAListening) {
                 log("Already listening.")
                 return
             }
             log("Starting transcription...")
-            this.isListening = true
+            this.isWSAListening = true
             await this.page!.evaluate(startListening)
         })
 
@@ -39,12 +83,12 @@ class Daemon {
                 log("Browser not ready - cannot stop transcription")
                 return
             }
-            if (!this.isListening) {
+            if (!this.isWSAListening) {
                 log("Cannot call stop before start")
                 return
             }
             log("Stopping transcription...")
-            this.isListening = false
+            this.isWSAListening = false
             await this.page!.evaluate(stopListening)
         })
     }
@@ -90,6 +134,8 @@ class Daemon {
 
     private handleSpeechUpdate(payload: { totalText: string; interimResults: string }) {
         log(`Total: "${payload.totalText}", Interim: "${payload.interimResults}"`)
+        const fullStr = payload.totalText + " " + payload.interimResults
+        log(`len: ${fullStr.length}`)
     }
 
     private handleSpeechError(payload: { error: string; message: string }) {
@@ -97,14 +143,24 @@ class Daemon {
         log(`${isWarning ? "WARNING" : "ERROR"}: ${payload.message}`)
     }
 
-    public async start() {
+    //start spawns browser and server listener
+    public async start(port: number | string) {
         await this.initBrowser()
 
-        this.app.listen(this.port, () => {
-            log(`SERVER STARTED ON PORT: ${this.port}`)
+        this.app.listen(port, () => {
+            log(`SERVER STARTED ON PORT: ${port}`)
         })
+    }
+
+    async testInsertion() {
+        this.insertText("hello world")
+        this.insertText("I am indee")
+        this.insertText("very careful")
+        await new Promise((res) => setTimeout(res, 1000))
+        this.dotool.kill("SIGTERM")
     }
 }
 
-const daemon = new Daemon(PORT)
-daemon.start().catch(console.error)
+const daemon = new Daemon()
+//daemon.testInsertion().catch((e) => console.error)
+daemon.start(PORT).catch(console.error)

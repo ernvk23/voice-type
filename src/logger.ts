@@ -23,5 +23,5 @@ export class Logger {
 const logger = new Logger()
 
 export function log(msg: string) {
-    logger.log(msg)
+    logger.log("[DAEMON] " + msg)
 }
