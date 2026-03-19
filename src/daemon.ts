@@ -3,6 +3,7 @@ import { startListening, stopListening, initWSA } from "./browser.js"
 import TypingController from "./typingController.js"
 import { log } from "./logger.js"
 import express, { type Express } from "express"
+import Notifier from "./notifier.js"
 
 export default class Daemon {
     private browser: Browser | null = null
@@ -11,6 +12,7 @@ export default class Daemon {
     private app: Express
 
     private typingController: TypingController
+    private notifier: Notifier
     private stopCooldown: boolean = false
     private stopCooldownTimeout: NodeJS.Timeout | null = null
 
@@ -18,6 +20,7 @@ export default class Daemon {
         this.app = express()
         this.setupRoutes()
         this.typingController = new TypingController()
+        this.notifier = new Notifier({ textNotifsEnabled: true, soundsNotifsEnabled: true })
     }
 
     private setupRoutes() {
