@@ -18,10 +18,14 @@ Real-time speech-to-text dictation for Linux Wayland. Type into any application 
 ```bash
 # Arch Linux
 sudo pacman -S --needed dotool libnotify paplay google-chrome
+```
 
+```bash
 # Ubuntu/Debian
 sudo apt install dotool libnotify-bin pulseaudio-utils google-chrome-stable
+```
 
+```bash
 # Fedora
 sudo dnf install dotool libnotify pulseaudio-utils google-chrome-stable
 ```
@@ -29,7 +33,7 @@ sudo dnf install dotool libnotify pulseaudio-utils google-chrome-stable
 ### 2. Clone and Install
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/E-nkv/wraith.git
 cd wraith
 bun install
 ```
@@ -39,11 +43,13 @@ bun install
 Open GNOME Settings → Keyboard → Custom Shortcuts, then add:
 
 **Start Dictation (F9):**
+
 - Name: Wraith Start
 - Command: `curl http://127.0.0.1:3232/start`
 - Shortcut: F9
 
 **Stop Dictation (F10):**
+
 - Name: Wraith Stop
 - Command: `curl http://127.0.0.1:3232/stop`
 - Shortcut: F10
