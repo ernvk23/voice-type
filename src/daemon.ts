@@ -27,6 +27,8 @@ export default class Daemon {
         this.app.get("/start", async (req, res) => {
             if (!this.isBrowserReady()) {
                 log("Browser not ready - cannot start transcription")
+                this.notifier.notifyError("Browser not ready yet.")
+                res.status(503).send("Wait for browser")
                 return
             }
             if (this.isWSAListening) {
@@ -35,7 +37,9 @@ export default class Daemon {
             }
             log("Starting transcription...")
             this.isWSAListening = true
+            this.notifier.notifyMicStart()
             await this.page!.evaluate(startListening)
+            res.send("Listening")
         })
 
         this.app.get("/stop", async (req, res) => {
@@ -61,6 +65,13 @@ export default class Daemon {
         log(`Stopping transcription... Reason: ${reason}`)
         this.isWSAListening = false
         this.typingController.reset()
+
+        // Trigger corresponding notification
+        if (reason === "intentional") {
+            this.notifier.notifyMicStop()
+        } else if (reason === "offline") {
+            this.notifier.notifyOffline()
+        }
 
         // Set cooldown to prevent rapid successive stop requests
         this.stopCooldown = true
@@ -127,10 +138,16 @@ export default class Daemon {
 
     //start spawns browser and server listener
     public async start(port: number) {
-        await this.initBrowser()
-
-        this.app.listen(port, "127.0.0.1", () => {
-            log(`SERVER STARTED ON PORT: ${port}`)
-        })
+        try {
+            await this.initBrowser()
+            this.app.listen(port, "127.0.0.1", () => {
+                log(`SERVER STARTED ON PORT: ${port}`)
+                // Notify that the daemon is ready for user's hotkey
+                this.notifier.notifyDaemonStart("F9")
+            })
+        } catch (e) {
+            this.notifier.notifyError("Failed to initialize Wraith daemon.")
+            log(`Startup error: ${e}`)
+        }
     }
 }

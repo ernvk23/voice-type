@@ -3,3 +3,5 @@ export enum DiffEnum {
     ChangeRes = "CHANGE_RES",
     ChangeResAndClear = "CHANGE_RES_AND_CLEAR",
 }
+
+export type Urgency = "low" | "normal" | "critical"

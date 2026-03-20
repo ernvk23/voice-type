@@ -10,7 +10,7 @@ export function initWSA() {
     const rec = new SpeechRec()
     rec.continuous = true
     rec.interimResults = true
-    rec.lang = "en-EN"
+    rec.lang = "es-ES"
 
     rec.onstart = () => {
         console.log("Listening...")

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process"
-import { log } from "console"
+import { log } from "./logger.js"
 import { DiffEnum } from "./types.js"
 
 export default class TypingController {
