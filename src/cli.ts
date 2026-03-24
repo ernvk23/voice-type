@@ -1,6 +1,6 @@
 import { spawn } from "child_process"
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util"
-import { WORKING_WSA_LANGUAGES } from "./constants.js"
+import { WSA_LANGUAGES } from "./constants.js"
 import type { CliFlags } from "./types.js"
 
 const options = {
@@ -42,14 +42,19 @@ Options:
   -d, --detached           Run the daemon in the background (detached mode)
   -h, --help               Show this help message
 
-Supported Languages:
-  English: en-US, en-GB, en-AU, en-CA, en-IN
-  Spanish: es-ES, es-MX, es-AR, es-CO
+Supported Languages (most common):
+  English: en-US
+  Spanish: es-ES
   Russian: ru-RU
+  Chinese: zh-CN
+  French: fr-FR
+
+To see the exhaustive list of languages, visit:
+  https://github.com/E-nkv/voice-type/tree/master/src/constants.ts
 `
 
 function isValidLanguage(lang: string): boolean {
-    return Object.values(WORKING_WSA_LANGUAGES).includes(lang as any)
+    return Object.values(WSA_LANGUAGES).includes(lang as any)
 }
 
 function pruneFlags(flags: string[]) {
@@ -83,7 +88,7 @@ export function parseFlags(args: string[]): CliFlags {
     const lang = values.lang
     if (!isValidLanguage(lang)) {
         console.error(`Error: Invalid language '${lang}'`)
-        console.error(`Supported languages: ${Object.values(WORKING_WSA_LANGUAGES).join(", ")}`)
+        console.error(`Supported languages: ${Object.values(WSA_LANGUAGES).join(", ")}`)
         process.exit(1)
     }
 

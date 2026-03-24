@@ -4,6 +4,7 @@ import TypingController from "./typingController.js"
 import { log } from "./logger.js"
 import express, { type Express } from "express"
 import Notifier from "./notifier.js"
+import { sleep } from "bun"
 
 export default class Daemon {
     private wsaLanguage: string = "en-US"
@@ -32,6 +33,11 @@ export default class Daemon {
                 res.status(503).send("Wait for browser")
                 return
             }
+            if (this.stopCooldown) {
+                log("Start request ignored - still in cooldown period after stop")
+                res.status(429).send("Cooldown active - wait before starting")
+                return
+            }
             if (this.isWSAListening) {
                 log("Already listening.")
                 return
@@ -48,11 +54,11 @@ export default class Daemon {
             res.send("Stopped")
         })
 
-        this.app.get("/exit", async (req, res) => {
-            log("Exit requested...")
-            await this.notifier.notifyDaemonStopped()
-            res.send("Shutting down")
+        this.app.get("/stop-daemon", async (req, res) => {
+            await this.notifier.notifyDaemonStop()
+            res.send("Stopped daemon")
             await this.destroy()
+            await sleep(1000)
             process.exit(0)
         })
     }
@@ -89,7 +95,7 @@ export default class Daemon {
         }
         this.stopCooldownTimeout = setTimeout(() => {
             this.stopCooldown = false
-        }, 1000)
+        }, 100)
 
         await this.page!.evaluate(stopListening)
     }
@@ -146,13 +152,14 @@ export default class Daemon {
     public async start(port: number) {
         try {
             this.app.listen(port, "127.0.0.1", () => {
-                log(`SERVER STARTED ON PORT: ${port}`)
+                log(`server started on port: ${port}`)
             })
             await this.initBrowser()
-            await this.notifier.notifyDaemonStarted()
+            this.notifier.notifyDaemonStart("F9")
         } catch (e) {
             this.notifier.notifyError("Failed to initialize Voice Type daemon.")
             log(`Startup error: ${e}`)
+            process.exit(0)
         }
     }
 
@@ -160,11 +167,12 @@ export default class Daemon {
      * Cleanup resources when shutting down the daemon
      */
     public async destroy() {
-        log("Shutting down daemon...")
+        console.log("\n[DAEMON] Shutting down daemon...")
         this.notifier.destroy()
+        this.typingController.destroy()
+        clearTimeout(this.stopCooldownTimeout ?? undefined)
+
         await this.page?.close()
         await this.browser?.close()
-        this.typingController.destroy()
-        if (this.stopCooldownTimeout) clearTimeout(this.stopCooldownTimeout)
     }
 }
